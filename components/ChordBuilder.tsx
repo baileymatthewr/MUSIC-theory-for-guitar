@@ -8,6 +8,7 @@ import { type DotLabel, THEMES } from "@/lib/diagram";
 import { type ExportLayout, LAYOUT_LABELS, renderLayout } from "@/lib/compose";
 import { copyPng, downloadPng, downloadSvg, slugify } from "@/lib/export";
 import { noteLabel, staffNotes } from "@/lib/staff";
+import { isStandard, tuningName } from "@/lib/tuning";
 
 const PRESETS: { label: string; frets: string }[] = [
   { label: "C", frets: "x32010" },
@@ -61,7 +62,8 @@ export function ShapeInput({ store }: { store: ChordStore }) {
         <p className="hint">Low E → high e. Use x for muted, dashes or spaces when frets go past 9.</p>
       </div>
 
-      <div className="presets" aria-label="Presets">
+      {isStandard(store.tuning) ? (
+        <div className="presets" aria-label="Presets">
         {PRESETS.map((p) => (
           <button key={p.label} type="button" className="chip" onClick={() => store.updateFrets(parseFingering(p.frets)!)}>
             {p.label}
@@ -71,6 +73,14 @@ export function ShapeInput({ store }: { store: ChordStore }) {
           Clear
         </button>
       </div>
+      ) : (
+        <p className="hint presets-note">
+          Shape presets are for standard tuning.{" "}
+          <button type="button" className="link" onClick={() => store.updateFrets(EMPTY)}>
+            Clear the shape
+          </button>
+        </p>
+      )}
 
       <FretEditor
         frets={store.frets}
@@ -79,6 +89,7 @@ export function ShapeInput({ store }: { store: ChordStore }) {
         leftHanded={store.leftHanded}
         preferFlats={store.preferFlats}
         pcNames={store.pcNames}
+        tuning={store.tuning}
         onFretsChange={store.updateFrets}
         onFingerChange={store.setFinger}
       />
@@ -116,7 +127,7 @@ export function PreviewPanel({ store, layouts }: { store: ChordStore; layouts: E
 
   const preview = renderLayout(layout, frets, fingers, diagramOptions, staffOptions, 2);
   const exported = renderLayout(layout, frets, fingers, diagramOptions, staffOptions, scale);
-  const pitches = (staffOptions.notes ?? staffNotes(frets, store.preferFlats, store.pcNames)).map(noteLabel).join(" ");
+  const pitches = (staffOptions.notes ?? staffNotes(frets, store.preferFlats, store.pcNames, store.tuning)).map(noteLabel).join(" ");
   const base = store.effectiveTitle ? `${store.effectiveTitle}_${formatFingering(frets)}` : formatFingering(frets);
   const filename = slugify(layout === "box" ? base : `${base}_staff`);
 
@@ -159,7 +170,7 @@ export function PreviewPanel({ store, layouts }: { store: ChordStore; layouts: E
         />
       </div>
       <p className="meta mono">
-        {formatFingering(frets)} · frets {win.start}–{win.start + win.count - 1}
+        {formatFingering(frets)} · frets {win.start}–{win.start + win.count - 1} · {tuningName(store.tuning)}
         {store.match ? ` · ${store.match.name}${store.match.omitsFifth ? " (no 5th)" : ""}` : ""}
         {pitches && (
           <>

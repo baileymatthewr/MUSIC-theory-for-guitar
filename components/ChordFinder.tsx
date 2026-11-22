@@ -16,8 +16,8 @@ export default function ChordFinder({ store }: { store: ChordStore }) {
   const text = store.chordSearch;
   const parsed = useMemo(() => (text.trim() ? parseChordName(text) : null), [text]);
   const result = useMemo(
-    () => (parsed?.ok ? searchVoicings(chordQuery(parsed.chord), 24) : null),
-    [parsed],
+    () => (parsed?.ok ? searchVoicings(chordQuery(parsed.chord), 24, new Set(), store.tuning) : null),
+    [parsed, store.tuning],
   );
   const chord = parsed?.ok ? parsed.chord : null;
   const voicings = result?.voicings ?? [];
@@ -29,8 +29,10 @@ export default function ChordFinder({ store }: { store: ChordStore }) {
   const lastPicked = useRef<string | null>(null);
   const { updateFrets } = store;
   useEffect(() => {
-    if (!chord || !voicings.length || lastPicked.current === chord.input) return;
-    lastPicked.current = chord.input;
+    // Re-pick when the chord or the tuning changes.
+    const pickKey = `${chord?.input}|${store.tuning.join(",")}`;
+    if (!chord || !voicings.length || lastPicked.current === pickKey) return;
+    lastPicked.current = pickKey;
     if (voicings.some((v) => formatFingering(v.frets) === currentKey) && store.title === chord.input) return;
     updateFrets(voicings[0].frets, chord.input, pcNames);
     // eslint-disable-next-line react-hooks/exhaustive-deps

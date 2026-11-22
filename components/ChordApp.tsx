@@ -3,6 +3,7 @@
 import ChordBuilder, { PreviewPanel } from "./ChordBuilder";
 import ChordFinder from "./ChordFinder";
 import NotationView from "./NotationView";
+import TuningControl from "./TuningControl";
 import { type Tab, useChordStore } from "./useChordStore";
 
 const TABS: { id: Tab; label: string; blurb: string }[] = [
@@ -51,6 +52,7 @@ export default function ChordApp() {
         ))}
       </nav>
       <p className="tab-blurb">{active.blurb}</p>
+      <TuningControl store={store} />
 
       <div id={`panel-${store.tab}`} role="tabpanel" aria-labelledby={`tab-${store.tab}`}>
         {store.tab === "grips" && <ChordBuilder store={store} layouts={["box"]} />}

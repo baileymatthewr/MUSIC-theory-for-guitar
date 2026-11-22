@@ -5,6 +5,7 @@ import {
   type Fingering,
   MAX_FRET,
   STANDARD_TUNING,
+  type Tuning,
   STRING_COUNT,
   formatFingering,
   planFingering,
@@ -12,8 +13,13 @@ import {
 } from "./music.ts";
 import { type Accidental, type StaffNote, noteLabel, spelledNote } from "./staff.ts";
 
-export const MIN_MIDI = STANDARD_TUNING[0]; // E2
-export const MAX_MIDI = STANDARD_TUNING[STRING_COUNT - 1] + MAX_FRET; // E6
+export const MIN_MIDI = STANDARD_TUNING[0]; // E2 (standard tuning)
+export const MAX_MIDI = STANDARD_TUNING[STRING_COUNT - 1] + MAX_FRET; // E6 (standard tuning)
+
+/** Lowest open string to the highest string's top fret, for a tuning. */
+export function guitarRange(tuning: Tuning = STANDARD_TUNING): { min: number; max: number } {
+  return { min: Math.min(...tuning), max: Math.max(...tuning) + MAX_FRET };
+}
 
 /** Parse "C3 E3 G3", "Bb2, F3", "c#4" etc. Returns null if any token is invalid. */
 export function parseNotes(input: string): StaffNote[] | null {
@@ -36,8 +42,9 @@ export function sortNotes(notes: StaffNote[]): StaffNote[] {
   return [...notes].sort((a, b) => a.midi - b.midi || a.step - b.step);
 }
 
-export function inGuitarRange(nt: StaffNote): boolean {
-  return nt.midi >= MIN_MIDI && nt.midi <= MAX_MIDI;
+export function inGuitarRange(nt: StaffNote, tuning: Tuning = STANDARD_TUNING): boolean {
+  const { min, max } = guitarRange(tuning);
+  return nt.midi >= min && nt.midi <= max;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +97,7 @@ export function scoreVoicing(frets: Fingering): number {
 }
 
 /** Grips that play exactly the given pitches, one note per string. */
-export function exactVoicings(midis: number[], limit = 8): Voicing[] {
+export function exactVoicings(midis: number[], limit = 8, tuning: Tuning = STANDARD_TUNING): Voicing[] {
   const notes = [...new Set(midis)].sort((a, b) => a - b);
   if (notes.length === 0 || notes.length > STRING_COUNT) return [];
   const results = new Map<string, Voicing>();
@@ -106,7 +113,7 @@ export function exactVoicings(midis: number[], limit = 8): Voicing[] {
     }
     for (let s = 0; s < STRING_COUNT; s++) {
       if (frets[s] !== null) continue;
-      const f = notes[i] - STANDARD_TUNING[s];
+      const f = notes[i] - tuning[s];
       if (f < 0 || f > MAX_FRET) continue;
       frets[s] = f;
       place(i + 1);
@@ -121,13 +128,19 @@ export function exactVoicings(midis: number[], limit = 8): Voicing[] {
  * Other grips for the same chord: every pitch class covered, the written bass note
  * kept as the lowest sounding note (relaxed if nothing fits), any octaves.
  */
-export function chordVoicings(midis: number[], limit = 12, exclude: Set<string> = new Set()): Voicing[] {
+export function chordVoicings(
+  midis: number[],
+  limit = 12,
+  exclude: Set<string> = new Set(),
+  tuning: Tuning = STANDARD_TUNING,
+): Voicing[] {
   if (midis.length === 0) return [];
   const sorted = [...midis].sort((a, b) => a - b);
   return searchVoicings(
     { required: new Set(sorted.map((m) => m % 12)), optional: new Set(), bass: sorted[0] % 12 },
     limit,
     exclude,
+    tuning,
   ).voicings;
 }
 
@@ -148,6 +161,7 @@ export function searchVoicings(
   query: VoicingQuery,
   limit = 12,
   exclude: Set<string> = new Set(),
+  tuning: Tuning = STANDARD_TUNING,
 ): { voicings: Voicing[]; keptBass: boolean } {
   const { required, optional, bass } = query;
   if (required.size === 0 || required.size > STRING_COUNT) return { voicings: [], keptBass: true };
@@ -157,7 +171,7 @@ export function searchVoicings(
   const search = (keepBass: boolean) => {
     const results = new Map<string, Voicing>();
     for (let base = 1; base <= SEARCH_MAX_FRET - 3; base++) {
-      const options: number[][] = STANDARD_TUNING.map((open) => {
+      const options: number[][] = tuning.map((open) => {
         const opts: number[] = [-1]; // -1 = muted
         // Any string can also be stopped by the thumb, up to 7 frets behind the hand
         // (over the neck on the low E, or in front of the neck in thumb position).
@@ -174,7 +188,7 @@ export function searchVoicings(
       const walk = (s: number) => {
         if (s === STRING_COUNT) {
           const present = frets
-            .map((f, i) => (f === null ? null : (STANDARD_TUNING[i] + f) % 12))
+            .map((f, i) => (f === null ? null : (tuning[i] + f) % 12))
             .filter((pc): pc is number => pc !== null);
           if (present.length < minSounding) return;
           if (keepBass && bass !== null && present[0] !== bass) return;

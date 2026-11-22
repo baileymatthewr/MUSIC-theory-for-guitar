@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { STRING_SETS, diminishedFamily, harmonize, scaleNotes } from "./barryHarris.ts";
-import { formatFingering, identifyChord, parseFingering, type Fingering } from "./music.ts";
+import { formatFingering, identifyChord, parseFingering, playabilityWarnings, type Fingering } from "./music.ts";
 
 const names = (key: string, t: Parameters<typeof scaleNotes>[1]) => scaleNotes(key, t).map((n) => n.name).join(" ");
 const set = (id: string) => STRING_SETS.find((s) => s.id === id)!;
@@ -41,4 +41,31 @@ test("lowering a diminished note gives a dominant 7th; raising one gives a minor
   for (const d of fam.dominants) assert.ok(identifyChord(d.frets).some((m) => m.name.startsWith(d.name)), d.name);
   assert.deepEqual(fam.minors.map((d) => d.name).sort(), ["Abm6", "Bm6", "Dm6", "Fm6"]);
   assert.deepEqual(fam.minors.map((d) => d.move).sort(), ["Ab → A", "B → C", "D → Eb", "F → F#"]);
+});
+
+test("the scale is written from the root up to its octave", async () => {
+  const { scaleStaffNotes } = await import("./barryHarris.ts");
+  const label = (k: string, t: Parameters<typeof scaleNotes>[1]) => scaleStaffNotes(k, t).map((n) => `${n.letter}${n.accidental}${n.octave}`).join(" ");
+  assert.equal(label("C", "major6"), "C3 D3 E3 F3 G3 Ab3 A3 B3 C4");
+  assert.equal(label("Eb", "major6"), "Eb3 F3 G3 Ab3 Bb3 Cb4 C4 D4 Eb4");
+});
+
+test("inverted grips: top up, bass down, chords alternate, grips widen", async () => {
+  const { contraryMotion } = await import("./barryHarris.ts");
+  for (const start of [0, 2, 4, 6]) {
+    const steps = contraryMotion("C", "major6", start);
+    assert.ok(steps.length >= 5, `start ${start}: ${steps.length}`);
+    steps.forEach((st, i) => {
+      if (i === 0) return;
+      const prev = steps[i - 1];
+      assert.ok(st.midis[3] > prev.midis[3], "top goes up");
+      assert.ok(st.midis[0] < prev.midis[0], "bass goes down");
+      assert.notEqual(st.home, prev.home, "chords alternate");
+      assert.ok(st.midis[3] - st.midis[0] > prev.midis[3] - prev.midis[0], "wider each step");
+      assert.ok(!playabilityWarnings(st.frets).some((w) => w.level === "warn"), formatFingering(st.frets));
+    });
+  }
+  const first = contraryMotion("C", "major6", 6);
+  assert.equal(first[0].name, "C6/A");
+  assert.equal(first[1].name, "Ab°7");
 });

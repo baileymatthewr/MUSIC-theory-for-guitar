@@ -6,7 +6,11 @@ Fixed 3‑fret chord boxes often can't show wide voicings. Here the box always g
 
 ## Run it
 
-The site has three pages: `/` (home, with a short history of the guitar), `/chord-box` (the Chord Box Maker) and `/barry-harris` (Barry Harris diminished scales).
+The site has three sections: `/` (home, with a short history of the guitar), `/chord-box` (the Chord Box Maker) and `/barry-harris` (Barry Harris diminished scales). The Barry Harris section has three pages, linked by a sub-menu that carries the key and scale across:
+
+1. `/barry-harris`: **the scale** by itself, its eight notes written on the grand staff and mapped over the whole neck to the 15th fret. Home-chord notes are dark, diminished notes orange.
+2. `/barry-harris/scale-grips`: **scale grips**, each scale note harmonised as a drop-2 or drop-3 grip up the neck, with the diminished chord's dominant 7th and minor 6th family.
+3. `/barry-harris/inverted-grips`: **inverted grips**, contrary motion. Start from the home chord in close position (any of its four bass notes), then each step moves the top note up one scale note and the bass down one, so the grips widen while the chords alternate. The run stops when the spread can't be played. The Barry Harris pages use standard tuning.
 
 ```bash
 npm install
@@ -18,6 +22,14 @@ npm run typecheck
 ## Using it
 
 There are four tabs, and they all share the same current chord.
+
+### Tuning
+- Every tab has a **Tuning** bar. Standard (E A D G B E) is the default. Pick a preset (half or whole step down, Drop D, Double drop D, Drop C, DADGAD, Open D, G, E, A or C), or set each string's open note yourself, from a fifth below to a fourth above its standard note.
+- The tuning is shared: set it on Grips and it carries over to Notation, Chord Name and Integration, and changing it on any tab changes it everywhere. It's saved in the address (`tune=D2-A2-D3-G3-A3-D4`); links without it use standard.
+- Everything follows the tuning: chord names, note labels, the clickable neck, the grand staff (down to A1), and the grip search in Notation and Chord Name.
+- Every chord box prints the tuning's open notes above the strings, standard included.
+- The shape presets on Grips are standard-tuning shapes, so they're hidden in other tunings.
+- The Barry Harris page always uses standard tuning.
 
 ### Grips
 - **Click the neck** to place a note. Click the same fret again to make that string open. The row above the nut switches a string between open (○) and muted (✕). The neck scrolls up to fret 24.
@@ -61,10 +73,15 @@ There are four tabs, and they all share the same current chord.
 | `lib/music.ts` | Tuning, fingering parsing, chord naming, barre and finger suggestions, playability checks, fret‑window sizing |
 | `lib/diagram.ts` | Pure function that turns a shape into an SVG string, used by both the preview and the downloads |
 | `lib/staff.ts` | Grand-staff renderer (clefs, ledger lines, accidentals drawn as SVG paths, so no music font is needed) |
+| `lib/barryHarris.ts` | Barry Harris scales, harmonised grips, the diminished family and contrary motion |
+| `lib/neckMap.ts` | Whole-neck map of chosen notes |
 | `lib/compose.ts` | Combines the box and staff into one SVG for preview and export |
 | `lib/staff.ts` | Grand-staff renderer and note spelling (clefs, ledger lines, accidentals drawn as SVG paths, so no music font is needed) |
+| `lib/tuning.ts` | Tuning presets, per-string ranges, spelling and the `tune=` address format |
 | `lib/chordName.ts` | Chord-symbol parser (notes, intervals, which tones are optional) |
 | `lib/notation.ts` | Note parsing and the grip search (exact pitches, and other voicings of the chord) |
+| `lib/barryHarris.ts` | Barry Harris scales, harmonised grips, the diminished family and contrary motion |
+| `lib/neckMap.ts` | Whole-neck map of chosen notes |
 | `lib/compose.ts` | Combines the box and staff into one SVG for preview and export |
 | `lib/export.ts` | Browser helpers: SVG → PNG via canvas, download, clipboard |
 | `components/useChordStore.ts` | Shared state for all three tabs, synced to the URL |
@@ -73,4 +90,5 @@ There are four tabs, and they all share the same current chord.
 | `components/ChordFinder.tsx`, `VoicingCard.tsx` | Find-by-name panel and grip thumbnails |
 | `components/NotationView.tsx`, `NotationStaff.tsx` | Notation tab and the clickable staff |
 | `components/FretEditor.tsx` | Clickable neck |
+| `components/TuningControl.tsx` | Tuning bar shared by the four tabs |
 | `lib/*.test.ts` | `node:test` unit tests |

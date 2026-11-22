@@ -5,19 +5,25 @@ import {
   type Accidental,
   type StaffColors,
   type StaffNote,
-  STAFF_HEIGHT,
+  LOWEST_STEP,
   STAFF_WIDTH,
   ghostNoteMarkup,
   noteFromStep,
   noteLabel,
   renderStaffBody,
   stepAtY,
+  yForStep,
 } from "@/lib/staff";
+import type { Tuning } from "@/lib/music";
+
+// Tall enough to click notes down to A1 (low tunings).
+const STAFF_HEIGHT = Math.ceil(yForStep(LOWEST_STEP, "bass") + 12);
 import { inGuitarRange } from "@/lib/notation";
 
 interface Props {
   notes: StaffNote[];
   accidental: Accidental;
+  tuning?: Tuning;
   colors: StaffColors;
   onToggleStep: (step: number) => void;
   /** Right-click: cycle the accidental of the note on this step (♮ → ♯ → ♭). */
@@ -25,7 +31,7 @@ interface Props {
 }
 
 /** Grand staff you can click on: click a line or space to add a note, click it again to remove it. */
-export default function NotationStaff({ notes, accidental, colors, onToggleStep, onCycleStep }: Props) {
+export default function NotationStaff({ notes, accidental, tuning, colors, onToggleStep, onCycleStep }: Props) {
   const ref = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
 
@@ -41,11 +47,12 @@ export default function NotationStaff({ notes, accidental, colors, onToggleStep,
     highlightRoot: false,
     colors,
     notes,
+    minHeight: STAFF_HEIGHT,
   });
 
   const hoverNote = hover !== null ? noteFromStep(hover, accidental) : null;
   const hoverExisting = hover !== null ? notes.find((n) => n.step === hover) : undefined;
-  const hoverOk = hoverNote ? inGuitarRange(hoverNote) : false;
+  const hoverOk = hoverNote ? inGuitarRange(hoverNote, tuning) : false;
 
   return (
     <div className="notation-staff">

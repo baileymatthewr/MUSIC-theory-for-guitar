@@ -15,7 +15,8 @@ import {
   staffNotes,
 } from "@/lib/staff";
 import { chordToPitches, parseChordName } from "@/lib/chordName";
-import { chordVoicings, exactVoicings, inGuitarRange, parseNotes, sortNotes } from "@/lib/notation";
+import { chordVoicings, exactVoicings, guitarRange, inGuitarRange, parseNotes, sortNotes } from "@/lib/notation";
+import { midiToNote } from "@/lib/tuning";
 
 const ACCIDENTALS: { value: Accidental; label: string; title: string; key: string }[] = [
   { value: "b", label: "♭", title: "Flat", key: "b" },
@@ -32,15 +33,18 @@ export default function NotationView({ store }: { store: ChordStore }) {
 
   const midis = useMemo(() => notes.map((n) => n.midi), [notes]);
   const guesses = useMemo(() => identifyPitches(midis), [midis]);
-  const exact = useMemo(() => exactVoicings(midis, 8), [midis]);
+  const { tuning } = store;
+  const exact = useMemo(() => exactVoicings(midis, 8, tuning), [midis, tuning]);
   const others = useMemo(
-    () => (midis.length >= 2 ? chordVoicings(midis, 12, new Set(exact.map((v) => formatFingering(v.frets)))) : []),
+    () => (midis.length >= 2 ? chordVoicings(midis, 12, new Set(exact.map((v) => formatFingering(v.frets))), tuning) : []),
     [midis, exact],
   );
   const currentKey = formatFingering(store.frets);
   const guess = guesses[0];
   const textValid = parseNotes(store.noteText) !== null;
-  const outOfRange = notes.filter((n) => !inGuitarRange(n));
+  const outOfRange = notes.filter((n) => !inGuitarRange(n, tuning));
+  const range = guitarRange(tuning);
+  const rangeText = `${midiToNote(range.min)}–${midiToNote(range.max)}`;
 
   // Keyboard: b = flat, n = natural, # or s = sharp (ignored while typing in a field).
   const { setAccidental } = store;
@@ -65,7 +69,7 @@ export default function NotationView({ store }: { store: ChordStore }) {
     for (let i = 1; i <= 2; i++) {
       const acc = CYCLE[(CYCLE.indexOf(existing.accidental) + i) % 3];
       const nt = noteFromStep(step, acc);
-      if (inGuitarRange(nt)) {
+      if (inGuitarRange(nt, tuning)) {
         store.updateNotes(notes.map((n) => (n === existing ? nt : n)));
         return;
       }
@@ -80,8 +84,8 @@ export default function NotationView({ store }: { store: ChordStore }) {
       store.updateNotes(notes.filter((n) => n !== existing));
       return;
     }
-    if (!inGuitarRange(nt)) {
-      setMessage(`${noteLabel(nt)} is outside the guitar's range (E2–E6).`);
+    if (!inGuitarRange(nt, tuning)) {
+      setMessage(`${noteLabel(nt)} is outside the guitar's range in this tuning (${rangeText}).`);
       return;
     }
     if (existing) {
@@ -135,7 +139,7 @@ export default function NotationView({ store }: { store: ChordStore }) {
             ))}
           </div>
           <div className="toolbar-actions">
-            <button type="button" className="link" onClick={() => store.updateNotes(staffNotes(store.frets, store.preferFlats, store.pcNames))}>
+            <button type="button" className="link" onClick={() => store.updateNotes(staffNotes(store.frets, store.preferFlats, store.pcNames, tuning))}>
               Load current grip
             </button>
             <button type="button" className="link" onClick={() => store.updateNotes([])}>
@@ -165,6 +169,7 @@ export default function NotationView({ store }: { store: ChordStore }) {
         <NotationStaff
           notes={notes}
           accidental={store.accidental}
+          tuning={tuning}
           colors={{ ink: "#1a1a1a", background: "#ffffff", root: "#c2410c" }}
           onToggleStep={toggleStep}
           onCycleStep={cycleStep}

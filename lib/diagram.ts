@@ -11,9 +11,11 @@ import {
   STRING_COUNT,
   fretWindow,
   intervalName,
+  type Tuning,
   midiAt,
   pitchClassName,
 } from "./music.ts";
+import { STANDARD, tuningLetters } from "./tuning.ts";
 
 export type DotLabel = "none" | "finger" | "note" | "interval";
 
@@ -44,6 +46,8 @@ export interface DiagramOptions {
   preferFlats: boolean;
   /** Optional spelling per pitch class (index 0–11); overrides preferFlats. */
   pcNames?: string[];
+  /** Open-string notes, low → high (standard if omitted). Always printed above the strings. */
+  tuning?: Tuning;
   colors: DiagramColors;
   fontFamily: string;
 }
@@ -77,6 +81,7 @@ const FRET_GAP = 28;
 const DOT_R = 9;
 const SIDE_PAD = 42; // room for the "12fr" label clear of a dot on the outer string
 const MARKER_H = 22;
+const TUNING_H = 14;
 const NUT_H = 5;
 
 function esc(s: string): string {
@@ -126,7 +131,9 @@ export function renderChordBody(frets: Fingering, fingers: Fingers, opts: Diagra
   const bottomH = opts.bottomLabel !== "none" ? 24 : 10;
 
   const width = SIDE_PAD * 2 + gridW;
-  const gridTop = titleH + MARKER_H;
+  const tuningY = titleH + 9;
+  const gridTop = titleH + TUNING_H + MARKER_H;
+  const tuning = opts.tuning ?? STANDARD;
   const height = gridTop + gridH + bottomH;
 
   const xOf = (s: number) => SIDE_PAD + (opts.leftHanded ? STRING_COUNT - 1 - s : s) * STRING_GAP;
@@ -135,7 +142,7 @@ export function renderChordBody(frets: Fingering, fingers: Fingers, opts: Diagra
   const labelFor = (s: number, kind: DotLabel): string => {
     const f = frets[s];
     if (f === null || kind === "none") return "";
-    const pc = midiAt(s, f) % 12;
+    const pc = midiAt(s, f, tuning) % 12;
     if (kind === "finger") return fingers[s] ? String(fingers[s]) : "";
     if (kind === "note") return opts.pcNames?.[pc] ?? pitchClassName(pc, opts.preferFlats);
     if (kind === "interval") return opts.root === null ? "" : intervalName(pc, opts.root);
@@ -143,7 +150,7 @@ export function renderChordBody(frets: Fingering, fingers: Fingers, opts: Diagra
   };
   const isRoot = (s: number) => {
     const f = frets[s];
-    return opts.highlightRoot && opts.root !== null && f !== null && midiAt(s, f) % 12 === opts.root;
+    return opts.highlightRoot && opts.root !== null && f !== null && midiAt(s, f, tuning) % 12 === opts.root;
   };
 
   const parts: string[] = [];
@@ -208,6 +215,14 @@ export function renderChordBody(frets: Fingering, fingers: Fingers, opts: Diagra
       `<line x1="${x}" y1="${n(gridTop)}" x2="${x}" y2="${n(gridTop + gridH)}" stroke="${colors.ink}" stroke-width="${n(w)}"/>`,
     );
   }
+
+  // Tuning: the open-string note names, always shown, above the open/muted markers.
+  tuningLetters(tuning).forEach((name, s) => {
+    const label = name.replace("#", "♯").replace(/(?<=[A-G])b/, "♭");
+    parts.push(
+      `<text x="${xOf(s)}" y="${n(tuningY)}" text-anchor="middle" ${font} font-size="10.5" font-weight="600" fill="${colors.ink}" fill-opacity="0.65">${esc(label)}</text>`,
+    );
+  });
 
   // Open / muted markers
   const markerY = gridTop - (showNut ? NUT_H : 0) - MARKER_H / 2 + 1;

@@ -5,6 +5,8 @@
  * chord, the diminished chord, the chord, … through all their inversions.
  */
 import { type Fingering, STANDARD_TUNING, formatFingering, pitchClassName, planFingering, playabilityWarnings } from "./music.ts";
+import { exactVoicings } from "./notation.ts";
+import { type StaffNote, spelledNote, spellNote } from "./staff.ts";
 
 export type ScaleType = "major6" | "minor6" | "dom7" | "dom7b5";
 
@@ -248,4 +250,117 @@ export function diminishedFamily(frets: Fingering, key: string, type: ScaleType)
 /** Link into the Chord Box Maker with this grip and name. */
 export function chordBoxHref(frets: Fingering, name: string): string {
   return `/chord-box?f=${encodeURIComponent(formatFingering(frets))}&t=${encodeURIComponent(name)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Inverted grips: contrary motion
+// ---------------------------------------------------------------------------
+
+export interface MotionStep {
+  /** Sounding pitches low → high. */
+  midis: number[];
+  frets: Fingering;
+  home: boolean;
+  name: string;
+  /** Spelled notes, low → high. */
+  noteNames: string[];
+}
+
+/** Starting chords: the home chord in close position, each of its notes in turn in the bass. */
+export function motionStarts(key: string, type: ScaleType): { index: number; label: string }[] {
+  const notes = scaleNotes(key, type);
+  const root = notes[0].name;
+  const suffix = SCALES[type].suffix;
+  return [0, 2, 4, 6].map((i) => ({
+    index: i,
+    label: i === 0 ? `${root}${suffix}` : `${root}${suffix}/${notes[i].name}`,
+  }));
+}
+
+/**
+ * Contrary motion through the scale: start from the home chord in close position, then at each
+ * step move the top voice UP one scale note and the bass DOWN one, with the two inner voices each
+ * moving one scale note to whichever neighbour completes the new chord. Chords alternate home /
+ * diminished and the grip spreads wider every step, until it can no longer be played.
+ * When the outer voices meet on the same note (an octave or more apart), that note is doubled
+ * and the chord has three different notes.
+ */
+export function contraryMotion(key: string, type: ScaleType, startIndex = 0, maxSteps = 9): MotionStep[] {
+  const notes = scaleNotes(key, type);
+  const pcs = notes.map((n) => n.pc);
+  const root = notes[0];
+  const suffix = SCALES[type].suffix;
+
+  // Every scale pitch from E2 to E6, low → high.
+  const ladder: number[] = [];
+  for (let m = STANDARD_TUNING[0]; m <= STANDARD_TUNING[5] + 24; m++) if (pcs.includes(m % 12)) ladder.push(m);
+  const pcIndex = (m: number) => pcs.indexOf(m % 12);
+
+  // Close position: the bass between C3 and B3, then the next three home notes above it.
+  const startPc = pcs[startIndex];
+  const bassMidi = ladder.find((m) => m >= 48 && m % 12 === startPc)!;
+  let pos = [0, 2, 4, 6].map((k) => ladder.indexOf(bassMidi) + k);
+
+  const nameFor = (midis: number[], home: boolean) => {
+    const bass = notes[pcIndex(midis[0])];
+    return home ? `${root.name}${suffix}${bass.pc === root.pc ? "" : `/${bass.name}`}` : `${bass.name}°7`;
+  };
+
+  const steps: MotionStep[] = [];
+  let prevFrets: Fingering | null = null;
+  for (let step = 0; step < maxSteps; step++) {
+    // Candidate positions for this step.
+    const candidates: number[][] =
+      step === 0
+        ? [pos]
+        : [-1, 1].flatMap((d1) =>
+            [-1, 1].map((d2) => [pos[0] - 1, pos[1] + d1, pos[2] + d2, pos[3] + 1]),
+          );
+    let best: { pos: number[]; frets: Fingering; score: number; awkward: boolean } | null = null;
+    for (const c of candidates) {
+      if (c[0] < 0 || c[3] >= ladder.length) continue;
+      if (!(c[0] < c[1] && c[1] < c[2] && c[2] < c[3])) continue;
+      const midis = c.map((i) => ladder[i]);
+      const distinct = new Set(midis.map((m) => m % 12)).size;
+      const grips = exactVoicings(midis, 12);
+      for (const g of grips) {
+        // Stay near the previous grip on the neck.
+        const avg = (f: Fingering) => {
+          const fr = f.filter((x): x is number => x !== null && x > 0);
+          return fr.length ? fr.reduce((a, b) => a + b, 0) / fr.length : 0;
+        };
+        const move: number = prevFrets ? Math.abs(avg(g.frets) - avg(prevFrets)) : 0;
+        // Open strings only make sense near the nut; up the neck they force big jumps.
+        const fretted = g.frets.filter((x): x is number => x !== null && x > 0);
+        const opens = g.frets.filter((x) => x === 0).length;
+        const openPenalty = fretted.length && Math.max(...fretted) > 4 ? opens * 20 : 0;
+        // The thumb is allowed, but an ordinary grip is easier when there is one.
+        const thumbPenalty = planFingering(g.frets).thumbStrings.length ? 15 : 0;
+        const score: number = distinct * 100 + g.score - move * 3 - openPenalty - thumbPenalty;
+        if (!best || score > best.score) best = { pos: c, frets: g.frets, score, awkward: openPenalty > 0 };
+      }
+    }
+    // Stop once the spread can only be reached with open strings far from the hand.
+    if (!best || (best.awkward && step > 0)) break;
+    pos = best.pos;
+    prevFrets = best.frets;
+    const midis = pos.map((i) => ladder[i]);
+    const home = pcIndex(midis[3]) % 2 === 0;
+    steps.push({ midis, frets: best.frets, home, name: nameFor(midis, home), noteNames: midis.map((m) => notes[pcIndex(m)].name) });
+  }
+  return steps;
+}
+
+/** The scale written out for the staff: root between C3 and B3, up to the octave (9 notes). */
+export function scaleStaffNotes(key: string, type: ScaleType): StaffNote[] {
+  const notes = scaleNotes(key, type);
+  const rootMidi = 48 + notes[0].pc;
+  return [...SCALES[type].semis, 12].map((semi, i) => {
+    const nt = notes[i % 8];
+    const midi = rootMidi + semi;
+    const acc = nt.name.slice(1);
+    if (acc !== "" && acc !== "#" && acc !== "b") return spellNote(midi, keyFlats(key));
+    const shift = acc === "#" ? 1 : acc === "b" ? -1 : 0;
+    return spelledNote(nt.name[0], acc, Math.floor((midi - shift) / 12) - 1);
+  });
 }

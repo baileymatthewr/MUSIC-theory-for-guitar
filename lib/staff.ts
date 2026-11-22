@@ -6,7 +6,7 @@
  * All glyphs (clefs, noteheads, accidentals) are drawn as plain SVG paths so the
  * exported image never depends on installed music fonts.
  */
-import { type Fingering, midiAt, pitchClassName } from "./music.ts";
+import { type Fingering, type Tuning, midiAt, pitchClassName } from "./music.ts";
 
 export interface StaffColors {
   ink: string;
@@ -21,6 +21,10 @@ export interface StaffOptions {
   colors: StaffColors;
   /** Optional spelling per pitch class (index 0–11), e.g. from chordSpelling(). */
   pcNames?: string[];
+  /** Open-string notes (standard if omitted). */
+  tuning?: Tuning;
+  /** Make the image at least this tall (used by the clickable staff). */
+  minHeight?: number;
   /** Draw these spelled notes instead of the notes derived from the frets. */
   notes?: StaffNote[];
 }
@@ -103,10 +107,10 @@ export function spellNote(midi: number, preferFlats: boolean, pcNames?: string[]
 }
 
 /** Distinct sounding pitches, low → high. */
-export function staffNotes(frets: Fingering, preferFlats: boolean, pcNames?: string[]): StaffNote[] {
+export function staffNotes(frets: Fingering, preferFlats: boolean, pcNames?: string[], tuning?: Tuning): StaffNote[] {
   const midis = new Set<number>();
   frets.forEach((f, s) => {
-    if (f !== null) midis.add(midiAt(s, f));
+    if (f !== null) midis.add(midiAt(s, f, tuning));
   });
   return [...midis].sort((a, b) => a - b).map((m) => spellNote(m, preferFlats, pcNames));
 }
@@ -134,8 +138,9 @@ const BASS_TOP_STEP = 26; // A3
 const BASS_BOTTOM_STEP = 18; // G2
 
 /** Lowest/highest steps reachable in standard tuning up to fret 24: E2 … E6. */
-export const LOWEST_STEP = 16;
-export const HIGHEST_STEP = 44;
+// Wide enough for low tunings (A1) and raised top strings (G6).
+export const LOWEST_STEP = 12;
+export const HIGHEST_STEP = 46;
 
 /** Map a y coordinate (staff units) to the nearest step and the staff it belongs to. */
 export function stepAtY(y: number): { step: number; staff: "treble" | "bass" } {
@@ -269,7 +274,13 @@ export interface StaffBody {
 export function renderStaffBody(frets: Fingering, opts: StaffOptions): StaffBody {
   const { ink, background, root: rootColor } = opts.colors;
   const parts: string[] = [];
-  if (background) parts.push(`<rect width="${WIDTH}" height="${HEIGHT}" fill="${background}"/>`);
+  const notes = opts.notes
+    ? [...opts.notes].sort((a, b) => a.step - b.step || a.midi - b.midi)
+    : staffNotes(frets, opts.preferFlats, opts.pcNames, opts.tuning);
+  // Grow downwards for notes below the usual bottom (low tunings reach A1).
+  const lowestY = Math.max(0, ...notes.map((nt) => yForStep(nt.step, nt.staff)));
+  const height = Math.max(HEIGHT, opts.minHeight ?? 0, lowestY + HEAD_RY + 6);
+  if (background) parts.push(`<rect width="${WIDTH}" height="${n(height)}" fill="${background}"/>`);
 
   const right = WIDTH - 10;
   // Staff lines
@@ -288,9 +299,6 @@ export function renderStaffBody(frets: Fingering, opts: StaffOptions): StaffBody
     bassClef(LEFT + 7, BASS_TOP + SPACE, ink),
   );
 
-  const notes = opts.notes
-    ? [...opts.notes].sort((a, b) => a.step - b.step || a.midi - b.midi)
-    : staffNotes(frets, opts.preferFlats, opts.pcNames);
   for (const staff of ["treble", "bass"] as const) {
     const group = notes.filter((nt) => nt.staff === staff);
     if (group.length === 0) continue;
@@ -341,7 +349,7 @@ export function renderStaffBody(frets: Fingering, opts: StaffOptions): StaffBody
     });
   }
 
-  return { content: parts.join(""), width: WIDTH, height: HEIGHT };
+  return { content: parts.join(""), width: WIDTH, height: Number(n(height)) };
 }
 
 /** A single translucent note (with ledgers/accidental) for hover previews. */
@@ -367,4 +375,63 @@ export function renderStaffSvg(frets: Fingering, opts: StaffOptions, scale = 1) 
     body.content +
     `</svg>`;
   return { svg, width: body.width * scale, height: body.height * scale };
+}
+
+// ---------------------------------------------------------------------------
+// A sequence of single notes (e.g. a scale), left to right on the grand staff
+// ---------------------------------------------------------------------------
+
+const SEQ_FIRST_X = 74;
+const SEQ_GAP = 26;
+
+/**
+ * Notes in order on the grand staff, each with its own colour. Ledger lines and accidentals
+ * are drawn per note.
+ */
+export function renderSequenceSvg(
+  notes: StaffNote[],
+  colorOf: (index: number) => string,
+  colors: StaffColors,
+  scale = 1,
+): { svg: string; width: number; height: number } {
+  const { ink, background } = colors;
+  const width = SEQ_FIRST_X + notes.length * SEQ_GAP + 4;
+  const lowestY = Math.max(0, ...notes.map((nt) => yForStep(nt.step, nt.staff)));
+  const height = Math.max(HEIGHT, lowestY + HEAD_RY + 6);
+  const right = width - 10;
+  const parts: string[] = [];
+  if (background) parts.push(`<rect width="${n(width)}" height="${n(height)}" fill="${background}"/>`);
+  for (const top of [TREBLE_TOP, BASS_TOP]) {
+    for (let i = 0; i < 5; i++) {
+      const y = top + i * SPACE;
+      parts.push(`<line x1="${LEFT}" y1="${y}" x2="${n(right)}" y2="${y}" stroke="${ink}" stroke-width="0.9"/>`);
+    }
+  }
+  const sysBottom = BASS_TOP + 4 * SPACE;
+  parts.push(
+    `<line x1="${LEFT}" y1="${TREBLE_TOP}" x2="${LEFT}" y2="${sysBottom}" stroke="${ink}" stroke-width="1.2"/>`,
+    `<line x1="${n(right)}" y1="${TREBLE_TOP}" x2="${n(right)}" y2="${sysBottom}" stroke="${ink}" stroke-width="1.2"/>`,
+    brace(LEFT - 4, TREBLE_TOP, sysBottom, ink),
+    trebleClef(LEFT + 9, TREBLE_TOP + 3 * SPACE, ink),
+    bassClef(LEFT + 7, BASS_TOP + SPACE, ink),
+  );
+  notes.forEach((nt, i) => {
+    const x = SEQ_FIRST_X + i * SEQ_GAP + 6;
+    const y = yForStep(nt.step, nt.staff);
+    for (const st of ledgerSteps(nt.step, nt.staff)) {
+      const ly = yForStep(st, nt.staff);
+      parts.push(
+        `<line x1="${n(x - HEAD_RX - 3)}" y1="${n(ly)}" x2="${n(x + HEAD_RX + 3)}" y2="${n(ly)}" stroke="${ink}" stroke-width="0.9"/>`,
+      );
+    }
+    const c = colorOf(i);
+    if (nt.accidental === "#") parts.push(sharp(x - HEAD_RX - 6, y, c));
+    if (nt.accidental === "b") parts.push(flat(x - HEAD_RX - 6, y, c));
+    parts.push(wholeNote(x, y, c));
+  });
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${n(width * scale)}" height="${n(height * scale)}" viewBox="0 0 ${n(width)} ${n(height)}">` +
+    parts.join("") +
+    `</svg>`;
+  return { svg, width: width * scale, height: height * scale };
 }

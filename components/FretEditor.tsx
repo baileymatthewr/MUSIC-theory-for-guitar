@@ -1,6 +1,7 @@
 "use client";
 
-import { DOUBLE_INLAYS, type Finger, type Fingering, type Fingers, SINGLE_INLAYS, STRING_COUNT, STRING_NAMES, midiAt, pitchClassName } from "@/lib/music";
+import { DOUBLE_INLAYS, type Finger, type Fingering, type Fingers, SINGLE_INLAYS, STRING_COUNT, type Tuning, midiAt, pitchClassName } from "@/lib/music";
+import { STANDARD, tuningLetters } from "@/lib/tuning";
 
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
   leftHanded: boolean;
   preferFlats: boolean;
   pcNames?: string[];
+  tuning?: Tuning;
   onFretsChange: (frets: Fingering) => void;
   onFingerChange: (string: number, finger: Finger | null) => void;
 }
@@ -26,9 +28,12 @@ export default function FretEditor({
   leftHanded,
   preferFlats,
   pcNames,
+  tuning = STANDARD,
   onFretsChange,
   onFingerChange,
 }: Props) {
+  // String names come from the tuning (e.g. D A D G A D for DADGAD).
+  const STRING_NAMES = tuningLetters(tuning).map((n) => n.replace("#", "♯").replace(/(?<=[A-G])b/, "♭"));
   const order = Array.from({ length: STRING_COUNT }, (_, i) => (leftHanded ? STRING_COUNT - 1 - i : i));
 
   const setString = (s: number, value: number | null) => {
@@ -86,7 +91,7 @@ export default function FretEditor({
             ) : null}
             {order.map((s) => {
               const active = frets[s] === f;
-              const pc = midiAt(s, f) % 12;
+              const pc = midiAt(s, f, tuning) % 12;
               const note = pcNames?.[pc] ?? pitchClassName(pc, preferFlats);
               return (
                 <button

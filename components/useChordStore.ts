@@ -20,6 +20,8 @@ import { DEFAULT_OPTIONS, type DiagramOptions, type DotLabel, THEMES } from "@/l
 import { type Accidental, type StaffNote, type StaffOptions, chordSpelling } from "@/lib/staff";
 import { formatNotes, parseNotes } from "@/lib/notation";
 import type { ExportLayout } from "@/lib/compose";
+import type { Tuning } from "@/lib/music";
+import { STANDARD, formatTuningParam, isStandard, parseTuningParam } from "@/lib/tuning";
 
 export type Tab = "grips" | "notation" | "chord" | "integration";
 export type Spelling = "auto" | "sharps" | "flats";
@@ -47,6 +49,9 @@ export function useChordStore() {
   const [titleFromFinder, setTitleFromFinder] = useState(false);
   // Spelling of the chord picked by name (E7#5 → B#), used while titleFromFinder holds.
   const [finderPcNames, setFinderPcNames] = useState<string[] | null>(null);
+
+  // ---- Tuning: shared by all four tabs, standard by default ----
+  const [tuning, setTuning] = useState<Tuning>(STANDARD);
 
   // ---- Chord finder ----
   const [chordSearch, setChordSearch] = useState("");
@@ -88,6 +93,8 @@ export function useChordStore() {
       setTitle(t);
       setTitleAuto(false);
     }
+    const tune = parseTuningParam(params.get("tune") ?? "");
+    if (tune) setTuning(tune);
     const c = params.get("c");
     if (c) setChordSearch(c);
     const v = params.get("v") as Tab | null;
@@ -107,17 +114,18 @@ export function useChordStore() {
     if (!titleAuto && title) params.set("t", title);
     if (notes.length) params.set("n", formatNotes(notes));
     if (chordSearch.trim()) params.set("c", chordSearch.trim());
+    if (!isStandard(tuning)) params.set("tune", formatTuningParam(tuning));
     window.history.replaceState(null, "", `?${params.toString()}`);
-  }, [tab, frets, title, titleAuto, notes, chordSearch]);
+  }, [tab, frets, title, titleAuto, notes, chordSearch, tuning]);
 
   // ---- Derived ----
-  const matches = useMemo(() => identifyChord(frets), [frets]);
+  const matches = useMemo(() => identifyChord(frets, tuning), [frets, tuning]);
   const match = matches[Math.min(matchIndex, Math.max(matches.length - 1, 0))] ?? null;
   const plan = useMemo(() => planFingering(frets), [frets]);
   const detectedBarre = plan.barre;
   const barre = drawBarre ? detectedBarre : null;
   const fingers = manualFingers ?? plan.fingers;
-  const warnings = useMemo(() => playabilityWarnings(frets, plan), [frets, plan]);
+  const warnings = useMemo(() => playabilityWarnings(frets, plan, tuning), [frets, plan, tuning]);
   const effectiveTitle = titleAuto ? (match?.name ?? "") : title;
   const preferFlats = spelling === "flats" || (spelling === "auto" && prefersFlats(match?.root ?? null));
   const window_ = fretWindow(frets, minRows);
@@ -131,7 +139,7 @@ export function useChordStore() {
         : undefined;
 
   // If the grip plays exactly the written notes, keep the user's spelling on the staff.
-  const gripMidis = soundingNotes(frets).map((n) => n.midi);
+  const gripMidis = soundingNotes(frets, tuning).map((n) => n.midi);
   const sameAsNotation =
     notes.length > 0 &&
     new Set(gripMidis).size === new Set(notes.map((n) => n.midi)).size &&
@@ -151,12 +159,14 @@ export function useChordStore() {
     preferFlats,
     pcNames,
     colors: THEMES[themeKey],
+    tuning,
   };
   const staffOptions: StaffOptions = {
     preferFlats,
     root: match?.root ?? null,
     highlightRoot,
     colors: THEMES[themeKey],
+    tuning,
     pcNames,
     notes: sameAsNotation ? notes : undefined,
   };
@@ -225,6 +235,8 @@ export function useChordStore() {
     },
     chordSearch,
     setChordSearch,
+    tuning,
+    setTuning,
     titleAuto,
     setTitleAuto,
     matchIndex,

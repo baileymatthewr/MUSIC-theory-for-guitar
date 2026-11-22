@@ -16,8 +16,14 @@ export const MAX_FRET = 24;
 
 /** MIDI note numbers for standard tuning E2 A2 D3 G3 B3 E4. */
 export const STANDARD_TUNING = [40, 45, 50, 55, 59, 64] as const;
+/** MIDI note of each open string, low (index 0) → high (5). */
+export type Tuning = readonly number[];
 export const STRING_NAMES = ["E", "A", "D", "G", "B", "e"] as const;
-const STRING_LABELS = ["low E", "A", "D", "G", "B", "high e"];
+/** "low D", "A", … "high e" style labels for messages, from the tuning's open notes. */
+function stringLabels(tuning: Tuning): string[] {
+  const names = tuning.map((m) => pitchClassName(m % 12, [1, 3, 8, 10].includes(m % 12)));
+  return names.map((n, i) => (i === 0 ? `low ${n}` : i === names.length - 1 ? `high ${n.toLowerCase()}` : n));
+}
 
 /** Fretboard inlay positions: single dots, and double dots at the octaves. */
 export const SINGLE_INLAYS = new Set([3, 5, 7, 9, 15, 17, 19, 21]);
@@ -38,8 +44,8 @@ export function pitchClassName(pc: number, preferFlats = false): string {
   return preferFlats ? FLAT_NAMES[i] : SHARP_NAMES[i];
 }
 
-export function midiAt(stringIndex: number, fret: number): number {
-  return STANDARD_TUNING[stringIndex] + fret;
+export function midiAt(stringIndex: number, fret: number, tuning: Tuning = STANDARD_TUNING): number {
+  return tuning[stringIndex] + fret;
 }
 
 export function emptyFingering(): Fingering {
@@ -51,10 +57,13 @@ export function emptyFingers(): Fingers {
 }
 
 /** Notes that actually sound, low → high, with their string index. */
-export function soundingNotes(frets: Fingering): { string: number; fret: number; midi: number }[] {
+export function soundingNotes(
+  frets: Fingering,
+  tuning: Tuning = STANDARD_TUNING,
+): { string: number; fret: number; midi: number }[] {
   const out: { string: number; fret: number; midi: number }[] = [];
   frets.forEach((f, s) => {
-    if (f !== null) out.push({ string: s, fret: f, midi: midiAt(s, f) });
+    if (f !== null) out.push({ string: s, fret: f, midi: midiAt(s, f, tuning) });
   });
   return out;
 }
@@ -151,8 +160,8 @@ function sameSet(a: number[], b: number[]): boolean {
 }
 
 /** All plausible names for the sounding notes, best first. */
-export function identifyChord(frets: Fingering): ChordMatch[] {
-  return identifyPitches(soundingNotes(frets).map((n) => n.midi));
+export function identifyChord(frets: Fingering, tuning: Tuning = STANDARD_TUNING): ChordMatch[] {
+  return identifyPitches(soundingNotes(frets, tuning).map((n) => n.midi));
 }
 
 /** All plausible names for a set of MIDI pitches (any order), best first. */
@@ -388,7 +397,12 @@ export interface Warning {
   message: string;
 }
 
-export function playabilityWarnings(frets: Fingering, plan: FingerPlan = planFingering(frets)): Warning[] {
+export function playabilityWarnings(
+  frets: Fingering,
+  plan: FingerPlan = planFingering(frets),
+  tuning: Tuning = STANDARD_TUNING,
+): Warning[] {
+  const labels = stringLabels(tuning);
   const warnings: Warning[] = [];
   const sounding = frets.filter((f) => f !== null);
   const fretted = frets.filter((f): f is number => f !== null && f > 0);
@@ -421,7 +435,7 @@ export function playabilityWarnings(frets: Fingering, plan: FingerPlan = planFin
     });
   } else if (plan.thumbStrings.length > 0) {
     const t = frets[plan.thumbStrings[0]] as number;
-    const names = plan.thumbStrings.map((s) => STRING_LABELS[s]);
+    const names = plan.thumbStrings.map((s) => labels[s]);
     const strings = names.length === 1 ? `the ${names[0]} string` : `the ${names.slice(0, -1).join(", ")} and ${names[names.length - 1]} strings`;
     const reach = fingered.length ? Math.max(...fingered) - t : 0;
     const stretch = reach >= 5 ? `, reaching ${reach} frets up to the highest note — a big stretch` : "";
@@ -429,8 +443,8 @@ export function playabilityWarnings(frets: Fingering, plan: FingerPlan = planFin
       plan.thumbStyle === "front"
         ? `Thumb position (as on cello): the thumb stops ${strings} at fret ${t} from the front of the neck, fingers free above${stretch}.`
         : plan.thumbStrings.length === 2
-          ? `Thumb barres the low E and A strings${stretch}.`
-          : `Uses the thumb on the low E string${stretch}.`;
+          ? `Thumb barres the ${labels[0]} and ${labels[1]} strings${stretch}.`
+          : `Uses the thumb on the ${labels[0]} string${stretch}.`;
     warnings.push({ level: "info", message });
   }
   if (sounding.length < 3) {
