@@ -1115,3 +1115,99 @@ button.link {
 .bh-motion-notes {
   margin-top: 12px;
 }
+
+/* ---------- Piano exercises ---------- */
+.pe-back {
+  margin: -6px 0 10px;
+}
+.pe-back a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.pe-title {
+  margin: 0 0 10px;
+  font-size: 22px;
+}
+.pe-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.pe-card {
+  position: relative;
+  width: 124px;
+}
+.pe-degree {
+  position: absolute;
+  top: -8px;
+  left: -6px;
+  z-index: 1;
+  min-width: 28px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.pe-moves {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pe-moves li.stay {
+  color: var(--ink);
+  font-weight: 600;
+}
+.pe-string {
+  display: inline-block;
+  width: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.pe-frets {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+/* ---------- About ---------- */
+.about {
+  max-width: 700px;
+}
+.about p,
+.about li {
+  font-size: 17px;
+  line-height: 1.65;
+}
+.about-lead {
+  font-size: 19px !important;
+}
+.about h2 {
+  margin: 30px 0 6px;
+  font-size: 21px;
+  letter-spacing: -0.01em;
+}
+.about-links {
+  padding-left: 20px;
+}
+.about-links li {
+  margin-bottom: 6px;
+}
+.about a,
+.home-about a {
+  color: var(--accent);
+  font-weight: 600;
+}
+.home-about {
+  margin-top: 26px;
+  font-size: 15px;
+}

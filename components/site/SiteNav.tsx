@@ -7,6 +7,8 @@ const LINKS = [
   { href: "/", label: "Home" },
   { href: "/chord-box", label: "Chord Box Maker" },
   { href: "/barry-harris", label: "Barry Harris Diminished" },
+  { href: "/piano-exercises", label: "Piano for Guitar" },
+  { href: "/about", label: "About" },
 ];
 
 export default function SiteNav() {

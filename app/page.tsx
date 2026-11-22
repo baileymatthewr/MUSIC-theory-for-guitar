@@ -12,6 +12,11 @@ const MODULES = [
     title: "Barry Harris Diminished",
     text: "Pick a key and see Barry Harris's sixth- and seventh-diminished scales harmonised as playable grips across the whole neck.",
   },
+  {
+    href: "/piano-exercises",
+    title: "Piano Exercises for Guitar",
+    text: "Keyboard voice-leading exercises on the fretboard, starting with I–IV–V as tight triads that barely move.",
+  },
 ];
 
 // Before the site had pages, the Chord Box Maker lived at "/". Send old links there.
@@ -50,6 +55,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
           </Link>
         ))}
       </section>
+
+      <p className="home-about">
+        Why standard notation instead of tab? <Link href="/about">Read about the thinking behind this site →</Link>
+      </p>
 
       <p className="home-sources">
         Further reading:{" "}

@@ -12,6 +12,10 @@ The site has three sections: `/` (home, with a short history of the guitar), `/c
 2. `/barry-harris/scale-grips`: **scale grips**, each scale note harmonised as a drop-2 or drop-3 grip up the neck, with the diminished chord's dominant 7th and minor 6th family.
 3. `/barry-harris/inverted-grips`: **inverted grips**, contrary motion. Start from the home chord in close position (any of its four bass notes), then each step moves the top note up one scale note and the bass down one, so the grips widen while the chords alternate. The run stops when the spread can't be played. The Barry Harris pages use standard tuning.
 
+`/about` explains why the site uses standard sheet music (the grand staff at concert pitch) rather than tablature.
+
+The **Piano Exercises for Guitar** section (`/piano-exercises`) adapts keyboard voice-leading drills. The first, `/piano-exercises/one-four-five`, plays I, IV and V as close triads on strings 4-3-2 (D, G, B), choosing each next grip with the least movement (common tone held, other notes moving a step). There's one row per inversion of the I chord, in any major key and for I–IV–V–I, I–IV–I–V–I or I–V–IV–I, with each string's movement shown between the grips.
+
 ```bash
 npm install
 npm run dev        # http://localhost:3000
@@ -74,6 +78,7 @@ There are four tabs, and they all share the same current chord.
 | `lib/diagram.ts` | Pure function that turns a shape into an SVG string, used by both the preview and the downloads |
 | `lib/staff.ts` | Grand-staff renderer (clefs, ledger lines, accidentals drawn as SVG paths, so no music font is needed) |
 | `lib/barryHarris.ts` | Barry Harris scales, harmonised grips, the diminished family and contrary motion |
+| `lib/pianoExercises.ts` | Piano exercises: close triads on a string set and least-movement progressions |
 | `lib/neckMap.ts` | Whole-neck map of chosen notes |
 | `lib/compose.ts` | Combines the box and staff into one SVG for preview and export |
 | `lib/staff.ts` | Grand-staff renderer and note spelling (clefs, ledger lines, accidentals drawn as SVG paths, so no music font is needed) |
@@ -81,6 +86,7 @@ There are four tabs, and they all share the same current chord.
 | `lib/chordName.ts` | Chord-symbol parser (notes, intervals, which tones are optional) |
 | `lib/notation.ts` | Note parsing and the grip search (exact pitches, and other voicings of the chord) |
 | `lib/barryHarris.ts` | Barry Harris scales, harmonised grips, the diminished family and contrary motion |
+| `lib/pianoExercises.ts` | Piano exercises: close triads on a string set and least-movement progressions |
 | `lib/neckMap.ts` | Whole-neck map of chosen notes |
 | `lib/compose.ts` | Combines the box and staff into one SVG for preview and export |
 | `lib/export.ts` | Browser helpers: SVG → PNG via canvas, download, clipboard |
